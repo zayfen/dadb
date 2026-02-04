@@ -32,8 +32,24 @@ interface Dadb : AutoCloseable {
 
     @Throws(IOException::class)
     fun shell(command: String): AdbShellResponse {
-        openShell(command).use { stream ->
-            return stream.readAll()
+        // Prefer shell v2 when supported, fallback to legacy shell otherwise
+        if (supportsFeature("shell_v2")) {
+            openShell(command).use { stream ->
+                return stream.readAll()
+            }
+        }
+
+        return try {
+            // Legacy shell does not provide exit code or stderr separately
+            open("shell:$command").use { stream ->
+                val output = stream.source.readString(Charsets.UTF_8)
+                AdbShellResponse(output, "", 0)
+            }
+        } catch (e: Throwable) {
+            // If feature detection is wrong, try v2 as fallback
+            openShell(command).use { stream ->
+                stream.readAll()
+            }
         }
     }
 

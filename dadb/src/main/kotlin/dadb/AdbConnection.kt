@@ -131,8 +131,15 @@ internal class AdbConnection internal constructor(
                     .map { it.split("=") }
                     .mapNotNull { if (it.size != 2) null else it[0] to it[1] }
                     .toMap()
-            if ("features" !in keyValues) throw IOException("Failed to parse features from connection string: $connectionString")
-            val features = keyValues.getValue("features").split(",").toSet()
+
+            // Some adbd implementations (e.g. Linux) may not include "features"
+            val featuresValue = keyValues["features"]
+            val features = if (featuresValue.isNullOrEmpty()) {
+                emptySet()
+            } else {
+                featuresValue.split(",").filter { it.isNotEmpty() }.toSet()
+            }
+
             return ConnectionString(features)
         }
     }
